@@ -5351,6 +5351,7 @@ def Load_models(pcbThickness,modules):
     
     #say (modules)
     missing_models = ''
+    ekMessage = ''
     compound_found=False
     loaded_models = []
     loaded_model_objs = []
@@ -5448,6 +5449,9 @@ def Load_models(pcbThickness,modules):
             if encoded!=1:
                 #step_module=step_module.decode("utf-8").replace(u'"', u'')  # name with spaces
                 step_module=step_module.replace(u'"', u'')  # name with spaces
+                step_module2=step_module2.replace(u'"', u'')  # name with spaces
+            
+            ekMessage += step_module2
             model_name=step_module[:-5]
             last_slash_pos1=model_name.rfind('/')
             last_slash_pos2=model_name.rfind('\\')
@@ -5462,6 +5466,7 @@ def Load_models(pcbThickness,modules):
             if blacklisted_model_elements.find(model_name) != -1:
                 blacklisted=1
         ###
+        
         if (blacklisted==0):
             if step_module != 'no3Dmodel':
                 createScaledObjs=False
@@ -5555,6 +5560,7 @@ def Load_models(pcbThickness,modules):
                             if os.path.exists(step_module2): # absolute path
                                 module_path=step_module2
                             else:
+                                print(step_module2 + 'not found')
                                 if os.path.exists(utf_path2):
                                     module_path=utf_path2
                     #sayerr(module_path)
@@ -5572,6 +5578,7 @@ def Load_models(pcbThickness,modules):
                             pos=step_module.rfind('.')
                             rel_pos=len(step_module2)-pos
                             step_module_t=step_module2[:-rel_pos+1]+u'STP'
+                            #step_module_t = step_module2
                             if os.path.exists(step_module_t): # absolute path
                                 module_path=step_module_t
                             else:
@@ -6177,11 +6184,15 @@ def Load_models(pcbThickness,modules):
         say("missing models");say (missing_models)
         missings=[]
         missings=missing_models.split('\r\n')
+        eks = []
+        eks = ekMessage.split('\r\n')
         n_rpt_max=10
         #if len (missings) > n_rpt_max: #warning_nbr =-1 for skipping the test
         wmsg="""... missing module(s)<br>"""
-        for i in range(min(len (missings),n_rpt_max)):
-            wmsg=wmsg+missings[i]+'<br>'
+        #for i in range(min(len (missings),n_rpt_max)):
+            #wmsg=wmsg+missings[i]+'<br>'
+        for i in range(min(len (eks),n_rpt_max)):
+            wmsg='<br>' + wmsg+eks[i]+'<br>'
         QtGui.QApplication.restoreOverrideCursor()
         reply = QtGui.QMessageBox.information(None,"Error ...",wmsg+'<br><b>. . . missing '+str(len(missings)-1)+' model(s)</b>' )
         if len (missings) > warning_nbr and warning_nbr != -1: #warning_nbr =-1 for skipping the test
@@ -7601,7 +7612,7 @@ def onLoadBoard(file_name=None):
     global original_filename, edge_width, load_sketch, grid_orig, warning_nbr, running_time, addConstraints
     global conv_offs, zfit
     
-    default_value='/'
+    default_value='/' 
     clear_console()
     #lastPcb_dir='C:/Cad/Progetti_K/ksu-test'
     #say(lastPcb_dir+' last Pcb dir')
@@ -7654,10 +7665,10 @@ def onLoadBoard(file_name=None):
             ##stop utf-8 test
             ini_vars[10] = last_pcb_path
             #cfg_update_all()
-            ## doc=FreeCAD.ActiveDocument
-            ## if doc is None:
-            ##     doc=FreeCAD.newDocument(fname)
-            doc=FreeCAD.newDocument(fname)
+            doc=FreeCAD.ActiveDocument
+            if doc is None:
+                 doc=FreeCAD.newDocument(fname)
+            ##doc=FreeCAD.newDocument(fname)
             pg = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/kicadStepUp")
             pg.SetString("last_pcb_path", make_string(last_pcb_path)) # py3 .decode("utf-8")
             #pg.SetString("last_pcb_path", last_pcb_path.decode("utf-8"))
