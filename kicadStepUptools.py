@@ -5351,7 +5351,6 @@ def Load_models(pcbThickness,modules):
     
     #say (modules)
     missing_models = ''
-    ekMessage = ''
     compound_found=False
     loaded_models = []
     loaded_model_objs = []
@@ -5365,13 +5364,58 @@ def Load_models(pcbThickness,modules):
     mod_cnt=0
     for i in range(len(modules)):
         step_module=modules[i][0]
+        oringalName = step_module # pop this name to one side for later
         #print(type(step_module))  #maui test py3
         #sayw('added '+str(i)+' model(s)')
         #say(modules[i]);
         #FreeCAD.Console.PrintMessage('step-module '+step_module)
         encoded=0
         sayw(step_module) # utf-8 test
-        if (step_module.startswith(':')) or (step_module.startswith('":')):  #alias 3D path
+        if step_module == 'no3Dmodel': # check we've actually a model to look for
+            module_name = 'no3Dmodel'
+        elif (step_module.startswith('$')): # if the path starts with an enviroment varible
+            if (step_module.find('${HOME}')!=-1):  #local 3D path
+                #step_module=step_module.replace('${KIPRJMOD}', '.')
+                home = expanduser("~")
+                #step_module=step_module.decode("utf-8").replace(u'${HOME}', home.decode("utf-8"))
+                step_module=step_module.replace(u'${HOME}', home)
+                step_module=step_module.replace(u'"', u'')  # name with spaces
+                encoded=1
+                say('adjusting Local Path')
+                say('step-module-replaced '+step_module)
+            elif (step_module.find('${KIPRJMOD}')!=-1):  #local 3D path
+                step_module = re.sub("\\\\", "/", step_module)
+                #if isinstance(step_module, str):
+                #    step_module = step_module.decode('unicode_escape')
+                last_pcb_path = re.sub("\\\\", "/", last_pcb_path)
+                #if isinstance(last_pcb_path, str):
+                #    last_pcb_path = last_pcb_path.decode('unicode_escape')
+                step_module=step_module.replace(u'${KIPRJMOD}', last_pcb_path)
+                #sm=step_module
+                #step_module=re.sub(r"^\$\{KIPRJMOD\}.*$",last_pcb_path, sm)
+                #step_module=re.sub('\${.KIPRJMOD}/', '', step_module)
+                step_module=step_module.replace(u'"', u'')  # name with spaces
+                encoded=1
+                say('adjusting Relative Path')
+                say('step-module-replaced '+step_module)
+            elif (step_module.find('${KISYS3DMOD}/')!=-1):  #local ${KISYS3DMOD} 3D path
+                #step_module=step_module.replace('${KIPRJMOD}', '.')
+                #step_module=step_module.decode("utf-8").replace(u'${KISYS3DMOD}/', u'')
+                step_module=step_module.replace(u'${KISYS3DMOD}/', u'')
+                step_module=step_module.replace(u'"', u'')  # name with spaces
+                #step_module=last_pcb_path+step_module[14:]
+                encoded=1
+                say('adjusting Local Path')
+                say('step-module-replaced '+step_module)
+            elif (step_module.find('${')!=-1) and encoded==0:  #extra local ${ENV} 3D path, ie $KICADPROJ
+                step_module= re.sub('\${.*?}/', '', step_module)        # just strip the unknown varible
+                #step_module=step_module.decode("utf-8").replace(u'${}/', u'')
+                step_module=step_module.replace(u'${}/', u'')
+                step_module=step_module.replace(u'"', u'')  # name with spaces
+                encoded=1
+                say('adjusting 2nd Local Path')
+                say('step-module-replaced '+step_module)      
+        elif (step_module.startswith(':')) or (step_module.startswith('":')):  #alias 3D path
             step_module_t=step_module.split(':', 1)[-1]
             step_module=step_module_t.split(':', 1)[-1]
             #step_module=step_module.decode("utf-8").replace(u'"', u'')  # name with spaces
@@ -5384,31 +5428,8 @@ def Load_models(pcbThickness,modules):
             #say(step_module.split(':')[1:])
             say('adjusting Alias Path')
             say('step-module-replaced '+step_module)
-        if (step_module.find('${HOME}')!=-1):  #local 3D path
-            #step_module=step_module.replace('${KIPRJMOD}', '.')
-            home = expanduser("~")
-            #step_module=step_module.decode("utf-8").replace(u'${HOME}', home.decode("utf-8"))
-            step_module=step_module.replace(u'${HOME}', home)
-            step_module=step_module.replace(u'"', u'')  # name with spaces
-            encoded=1
-            say('adjusting Local Path')
-            say('step-module-replaced '+step_module)
-        if (step_module.find('${KIPRJMOD}')!=-1):  #local 3D path
-            step_module = re.sub("\\\\", "/", step_module)
-            #if isinstance(step_module, str):
-            #    step_module = step_module.decode('unicode_escape')
-            last_pcb_path = re.sub("\\\\", "/", last_pcb_path)
-            #if isinstance(last_pcb_path, str):
-            #    last_pcb_path = last_pcb_path.decode('unicode_escape')
-            step_module=step_module.replace(u'${KIPRJMOD}', last_pcb_path)
-            #sm=step_module
-            #step_module=re.sub(r"^\$\{KIPRJMOD\}.*$",last_pcb_path, sm)
-            #step_module=re.sub('\${.KIPRJMOD}/', '', step_module)
-            step_module=step_module.replace(u'"', u'')  # name with spaces
-            encoded=1
-            say('adjusting Relative Path')
-            say('step-module-replaced '+step_module)
-        if (step_module.startswith('.')) or (step_module.startswith('".')):  #relative path
+        
+        elif (step_module.startswith('.')) or (step_module.startswith('".')):  #relative path
             #step_module=last_pcb_path+"/"+step_module
             step_module=last_pcb_path+os.sep+step_module
             step_module=step_module.replace(u'"', u'')  # name with spaces
@@ -5417,50 +5438,35 @@ def Load_models(pcbThickness,modules):
             sayw('adjusting Relative Path')
             say('step-module-replaced '+step_module)
             #stop
-        if (step_module.find('${KISYS3DMOD}/')!=-1):  #local ${KISYS3DMOD} 3D path
-            #step_module=step_module.replace('${KIPRJMOD}', '.')
-            #step_module=step_module.decode("utf-8").replace(u'${KISYS3DMOD}/', u'')
-            step_module=step_module.replace(u'${KISYS3DMOD}/', u'')
-            step_module=step_module.replace(u'"', u'')  # name with spaces
-            #step_module=last_pcb_path+step_module[14:]
-            encoded=1
-            say('adjusting Local Path')
-            say('step-module-replaced '+step_module)
-        if (step_module.find('${')!=-1) and encoded==0:  #extra local ${ENV} 3D path
-            step_module= re.sub('\${.*?}/', '', step_module)
-            #step_module=step_module.decode("utf-8").replace(u'${}/', u'')
-            step_module=step_module.replace(u'${}/', u'')
-            step_module=step_module.replace(u'"', u'')  # name with spaces
-            encoded=1
-            say('adjusting 2nd Local Path')
-            say('step-module-replaced '+step_module)      
-        if step_module != 'no3Dmodel':
-            #model_type = step_module.split('.')[1]
-            pos=step_module.rfind('.')
-            #sayw(pos)
-            rel_pos=len(step_module)-pos
-            #sayw(rel_pos)
-            #stop
-            step_module=step_module[:-rel_pos+1]+u'step'
-            #step_module=step_module[:-3]+'step'
-            step_module2=step_module[:-4]+u'stp'
-            step_module3=step_module[:-4]+u'iges'
-            step_module4=step_module[:-4]+u'igs'
-            if encoded!=1:
-                #step_module=step_module.decode("utf-8").replace(u'"', u'')  # name with spaces
-                step_module=step_module.replace(u'"', u'')  # name with spaces
-                step_module2=step_module2.replace(u'"', u'')  # name with spaces
+        
+        
+        #model_type = step_module.split('.')[1]
+        pos=step_module.rfind('.')
+        #sayw(pos)
+        rel_pos=len(step_module)-pos
+        #sayw(rel_pos)
+        #stop
+        fileName_no_ext = step_module[:-rel_pos] # keep this for error message later if needed
+        step_module=step_module[:-rel_pos+1]+u'step'
+        #step_module=step_module[:-3]+'step'
+        step_module2=step_module[:-4]+u'stp'
+        step_module3=step_module[:-4]+u'iges'
+        step_module4=step_module[:-4]+u'igs'
+        if encoded!=1:
+            #step_module=step_module.decode("utf-8").replace(u'"', u'')  # name with spaces
+            step_module=step_module.replace(u'"', u'')  # stip "
+            step_module2=step_module2.replace(u'"', u'')  # from
+            step_module3=step_module3.replace(u'"', u'')  # all 3
+            step_module4=step_module4.replace(u'"', u'')  # extention options
             
-            ekMessage += step_module2
-            model_name=step_module[:-5]
-            last_slash_pos1=model_name.rfind('/')
-            last_slash_pos2=model_name.rfind('\\')
-            last_slash_pos=max(last_slash_pos1,last_slash_pos2)
-            model_name=model_name[last_slash_pos+1:]
-            #say('model name '+model_name+'.'+model_type)
-            say('model name '+model_name)
-        else:
-            model_name='no3Dmodel'
+        model_name=step_module[:-5]
+        last_slash_pos1=model_name.rfind('/')
+        last_slash_pos2=model_name.rfind('\\')
+        last_slash_pos=max(last_slash_pos1,last_slash_pos2)
+        model_name=model_name[last_slash_pos+1:]
+        #say('model name '+model_name+'.'+model_type)
+        say('model name '+model_name)
+        
         blacklisted=0
         if blacklisted_model_elements != '':
             if blacklisted_model_elements.find(model_name) != -1:
@@ -6143,10 +6149,10 @@ def Load_models(pcbThickness,modules):
                     else:                        
                         FreeCAD.ActiveDocument.removeObject(impPart.Name)
                 else:
-                    say("error missing "+ make_string(models3D_prefix)+make_string(step_module))
-                    test = missing_models.find(make_string(step_module))
+                    say("error missing "+ fileName_no_ext)
+                    test = missing_models.find(make_string(fileName_no_ext))
                     if test is -1:
-                        missing_models += make_string(models3D_prefix)+make_string(step_module)+'\r\n' #matched        
+                        missing_models += fileName_no_ext +'\r\n' #matched        
             ###
         gui_refresh=20
         if int(PySide.QtCore.qVersion().split('.')[0]) > 4 or use_Links:  # Qt5 or Links refresh
@@ -6184,17 +6190,14 @@ def Load_models(pcbThickness,modules):
         say("missing models");say (missing_models)
         missings=[]
         missings=missing_models.split('\r\n')
-        eks = []
-        eks = ekMessage.split('\r\n')
         n_rpt_max=10
         #if len (missings) > n_rpt_max: #warning_nbr =-1 for skipping the test
         wmsg="""... missing module(s)<br>"""
-        #for i in range(min(len (missings),n_rpt_max)):
-            #wmsg=wmsg+missings[i]+'<br>'
-        for i in range(min(len (eks),n_rpt_max)):
-            wmsg='<br>' + wmsg+eks[i]+'<br>'
+        for i in range(min(len (missings),n_rpt_max)):
+            wmsg=wmsg+missings[i]+'<br>'
+        wmsg += 'no .stp/.step, .igs/.iges files found for these modules' + '<br><b>. . . missing '+str(len(missings)-1)+' model(s)</b>'
         QtGui.QApplication.restoreOverrideCursor()
-        reply = QtGui.QMessageBox.information(None,"Error ...",wmsg+'<br><b>. . . missing '+str(len(missings)-1)+' model(s)</b>' )
+        reply = QtGui.QMessageBox.information(None,"Error ...",wmsg )
         if len (missings) > warning_nbr and warning_nbr != -1: #warning_nbr =-1 for skipping the test
             QtGui.QApplication.restoreOverrideCursor()
             wmsg="""<font color=red>"""
